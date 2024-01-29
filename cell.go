@@ -289,6 +289,28 @@ func setCellDuration(value time.Duration) (t string, v string) {
 	return
 }
 
+// SetCellNumber provides a function to set number type value of a cell by given
+// worksheet name, cell reference and cell value.
+func (f *File) SetCellNumber(sheet, cell string, value string) error {
+	f.mu.Lock()
+	ws, err := f.workSheetReader(sheet)
+	if err != nil {
+		f.mu.Unlock()
+		return err
+	}
+	f.mu.Unlock()
+	ws.mu.Lock()
+	defer ws.mu.Unlock()
+	c, col, row, err := ws.prepareCell(cell)
+	if err != nil {
+		return err
+	}
+	c.S = ws.prepareCellStyle(col, row, c.S)
+	c.T, c.V = "n", value
+	c.IS = nil
+	return f.removeFormula(c, ws, sheet)
+}
+
 // SetCellInt provides a function to set int type value of a cell by given
 // worksheet name, cell reference and cell value.
 func (f *File) SetCellInt(sheet, cell string, value int64) error {
