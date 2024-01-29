@@ -147,7 +147,7 @@ func (f *File) SetCellValue(sheet, cell string, value interface{}) error {
 		}
 		err = f.setDefaultTimeStyle(sheet, cell, getDurationNumFmt(v))
 	case time.Time:
-		err = f.setCellTimeFunc(sheet, cell, v)
+		err = f.SetCellTime(sheet, cell, v)
 	case bool:
 		err = f.SetCellBool(sheet, cell, v)
 	case nil:
@@ -233,9 +233,9 @@ func (f *File) setCellIntFunc(sheet, cell string, value interface{}) error {
 	return err
 }
 
-// setCellTimeFunc provides a method to process time type of value for
-// SetCellValue.
-func (f *File) setCellTimeFunc(sheet, cell string, value time.Time) error {
+// SetCellTime provides a function to set time type value of a cell by given
+// worksheet name, cell reference and cell value.
+func (f *File) SetCellTime(sheet, cell string, value time.Time) error {
 	ws, err := f.workSheetReader(sheet)
 	if err != nil {
 		return err
