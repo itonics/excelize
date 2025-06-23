@@ -6308,16 +6308,24 @@ func (fn *formulaFuncs) sumproduct(argsList *list.List) formulaArg {
 		if argType == ArgUnknown {
 			argType = token.Type
 		}
-		if token.Type != argType {
-			return newErrorFormulaArg(formulaErrorVALUE, formulaErrorVALUE)
-		}
 		switch token.Type {
 		case ArgString, ArgNumber:
-			if num := token.ToNumber(); num.Type == ArgNumber {
-				sum = fn.PRODUCT(argsList).Number
-				continue
+			if res == nil {
+				n = 1
+				res = make([]float64, n)
+				for i := range res {
+					res[i] = 1.0
+				}
 			}
-			return newErrorFormulaArg(formulaErrorVALUE, formulaErrorVALUE)
+			if n != 1 {
+				return newErrorFormulaArg(formulaErrorVALUE, formulaErrorVALUE)
+			}
+			num := token.ToNumber()
+			if num.Type == ArgNumber {
+				res[0] *= num.Number
+			} else {
+				res[0] = 0
+			}
 		case ArgMatrix:
 			args := token.ToList()
 			if res == nil {
@@ -6332,8 +6340,8 @@ func (fn *formulaFuncs) sumproduct(argsList *list.List) formulaArg {
 			}
 			for i, value := range args {
 				num := value.ToNumber()
-				if num.Type != ArgNumber && value.Value() != "" {
-					return newErrorFormulaArg(formulaErrorVALUE, formulaErrorVALUE)
+				if num.Type != ArgNumber {
+					num = newNumberFormulaArg(0)
 				}
 				res[i] = res[i] * num.Number
 			}

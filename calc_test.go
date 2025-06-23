@@ -974,10 +974,14 @@ func TestCalcCellValue(t *testing.T) {
 		"SUMIF(D1:D3,\"Month\",D1:D3)":   "0",
 		// SUMPRODUCT
 		"SUMPRODUCT(A1,B1)":             "4",
+		"SUMPRODUCT(B1,A1)":             "4",
+		"SUMPRODUCT(A1,D1)":             "0",
 		"SUMPRODUCT(A1:A2,B1:B2)":       "14",
 		"SUMPRODUCT(A1:A3,B1:B3)":       "14",
 		"SUMPRODUCT(A1:B3)":             "15",
 		"SUMPRODUCT(A1:A3,B1:B3,B2:B4)": "20",
+		"SUMPRODUCT(A1:A3,D1:D3)":       "0",
+		"SUMPRODUCT(\"\")":              "0",
 		// SUMSQ
 		"SUMSQ(A1:A4)":              "14",
 		"SUMSQ(A1,B1,A2,B2,6)":      "82",
@@ -3206,10 +3210,7 @@ func TestCalcCellValue(t *testing.T) {
 		// SUMPRODUCT
 		"SUMPRODUCT()":            {"#VALUE!", "SUMPRODUCT requires at least 1 argument"},
 		"SUMPRODUCT(A1,B1:B2)":    {"#VALUE!", "#VALUE!"},
-		"SUMPRODUCT(A1,D1)":       {"#VALUE!", "#VALUE!"},
-		"SUMPRODUCT(A1:A3,D1:D3)": {"#VALUE!", "#VALUE!"},
 		"SUMPRODUCT(A1:A2,B1:B3)": {"#VALUE!", "#VALUE!"},
-		"SUMPRODUCT(\"\")":        {"#VALUE!", "#VALUE!"},
 		"SUMPRODUCT(A1,NA())":     {"#N/A", "#N/A"},
 		// SUMX2MY2
 		"SUMX2MY2()":         {"#VALUE!", "SUMX2MY2 requires 2 arguments"},
