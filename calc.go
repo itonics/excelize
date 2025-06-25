@@ -16266,13 +16266,13 @@ func (fn *formulaFuncs) INDEX(argsList *list.List) formulaArg {
 	}
 	rowArg := argsList.Front().Next().Value.(formulaArg).ToNumber()
 	if rowArg.Type != ArgNumber {
-		return rowArg
+		return newErrorFormulaArg(formulaErrorVALUE, rowArg.Error)
 	}
 	rowIdx, colIdx := int(rowArg.Number)-1, -1
 	if argsList.Len() == 3 {
 		colArg := argsList.Back().Value.(formulaArg).ToNumber()
 		if colArg.Type != ArgNumber {
-			return colArg
+			return newErrorFormulaArg(formulaErrorVALUE, colArg.Error)
 		}
 		colIdx = int(colArg.Number) - 1
 	}
