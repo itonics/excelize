@@ -345,6 +345,8 @@ func (fa formulaArg) ToNumber() formulaArg {
 		if args := fa.ToList(); len(args) > 0 {
 			return args[0].ToNumber()
 		}
+	case ArgError:
+		return fa
 	}
 	return newNumberFormulaArg(n)
 }
@@ -363,6 +365,8 @@ func (fa formulaArg) ToBool() formulaArg {
 		if fa.Number == 1 {
 			b = true
 		}
+	case ArgError:
+		return fa
 	}
 	return newBoolFormulaArg(b)
 }
