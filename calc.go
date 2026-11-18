@@ -1033,14 +1033,14 @@ func newEmptyFormulaArg() formulaArg {
 //	opfd - Operand of the operation formula
 //	opft - Operator of the operation formula
 //	args - Arguments list of the operation formula
+//	opfdBases - Length of opfd at the start of each operation formula
 type infixEvalState struct {
 	inArray, inArrayRow             bool
 	formulaArray                    [][]formulaArg
 	formulaArrayRow                 []formulaArg
 	opdStack, optStack, opfStack    *Stack
 	opfdStack, opftStack, argsStack *Stack
-	// opfdBases holds, per open function, the opfdStack length when it started
-	opfdBases *Stack
+	opfdBases                       *Stack
 }
 
 // evalInfixExp evaluate syntax analysis by given infix expression after lexical
@@ -1077,7 +1077,7 @@ func (f *File) evalInfixExp(ctx *calcContext, sheet, cell string, tokens []efp.T
 				s.opfStack.Push(token)
 				s.argsStack.Push(list.New().Init())
 				s.opftStack.Push(token) // to know which operators belong to a function use the function as a separator
-				// operands below this belong to the enclosing expression, not to the function's arguments
+				// operands below belong to the enclosing expression
 				s.opfdBases.Push(s.opfdStack.Len())
 			}
 			continue
@@ -1266,6 +1266,7 @@ func prepareEvalInfixExp(opfStack, opftStack, opfdStack, argsStack, opfdBases *S
 		}
 		opftStack.Pop()
 	}
+	// push opfd to args
 	if opfdStack.Len() > opfdBases.Peek().(int) {
 		argsStack.Peek().(*list.List).PushBack(opfdStack.Pop().(formulaArg))
 	}
