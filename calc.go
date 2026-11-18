@@ -1039,6 +1039,8 @@ type infixEvalState struct {
 	formulaArrayRow                 []formulaArg
 	opdStack, optStack, opfStack    *Stack
 	opfdStack, opftStack, argsStack *Stack
+	// opfdBases holds, per open function, the opfdStack length when it started
+	opfdBases *Stack
 }
 
 // evalInfixExp evaluate syntax analysis by given infix expression after lexical
@@ -1049,6 +1051,7 @@ func (f *File) evalInfixExp(ctx *calcContext, sheet, cell string, tokens []efp.T
 	s := &infixEvalState{
 		opdStack: NewStack(), optStack: NewStack(), opfStack: NewStack(),
 		opfdStack: NewStack(), opftStack: NewStack(), argsStack: NewStack(),
+		opfdBases: NewStack(),
 	}
 	for i := 0; i < len(tokens); i++ {
 		token := tokens[i]
@@ -1074,6 +1077,8 @@ func (f *File) evalInfixExp(ctx *calcContext, sheet, cell string, tokens []efp.T
 				s.opfStack.Push(token)
 				s.argsStack.Push(list.New().Init())
 				s.opftStack.Push(token) // to know which operators belong to a function use the function as a separator
+				// operands below this belong to the enclosing expression, not to the function's arguments
+				s.opfdBases.Push(s.opfdStack.Len())
 			}
 			continue
 		}
@@ -1117,7 +1122,7 @@ func (f *File) evalFuncStackToken(ctx *calcContext, sheet, cell string, token, n
 			}
 			s.opftStack.Pop()
 		}
-		if !s.opfdStack.Empty() {
+		if s.opfdStack.Len() > s.opfdBases.Peek().(int) {
 			s.argsStack.Peek().(*list.List).PushBack(s.opfdStack.Pop().(formulaArg))
 		}
 		return newEmptyFormulaArg(), nil
@@ -1127,7 +1132,7 @@ func (f *File) evalFuncStackToken(ctx *calcContext, sheet, cell string, token, n
 	if s.collectArrayToken(token) {
 		return newEmptyFormulaArg(), nil
 	}
-	if errArg := f.evalInfixExpFunc(ctx, sheet, cell, token, nextToken, s.opfStack, s.opdStack, s.opftStack, s.opfdStack, s.argsStack); errArg.Type == ArgError {
+	if errArg := f.evalInfixExpFunc(ctx, sheet, cell, token, nextToken, s.opfStack, s.opdStack, s.opftStack, s.opfdStack, s.argsStack, s.opfdBases); errArg.Type == ArgError {
 		return errArg, errors.New(errArg.Error)
 	}
 	return newEmptyFormulaArg(), nil
@@ -1157,7 +1162,7 @@ func (f *File) evalRangeToken(ctx *calcContext, sheet string, token, nextToken e
 	}
 	// when current token is range, next token is argument and opfdStack not empty,
 	// should push value to opfdStack and continue
-	if nextToken.TType == efp.TokenTypeArgument && !s.opfdStack.Empty() {
+	if nextToken.TType == efp.TokenTypeArgument && s.opfdStack.Len() > s.opfdBases.Peek().(int) {
 		s.opfdStack.Push(result)
 		return true, result, nil
 	}
@@ -1214,11 +1219,11 @@ func (s *infixEvalState) finish() (formulaArg, error) {
 }
 
 // evalInfixExpFunc evaluate formula function in the infix expression.
-func (f *File) evalInfixExpFunc(ctx *calcContext, sheet, cell string, token, nextToken efp.Token, opfStack, opdStack, opftStack, opfdStack, argsStack *Stack) formulaArg {
+func (f *File) evalInfixExpFunc(ctx *calcContext, sheet, cell string, token, nextToken efp.Token, opfStack, opdStack, opftStack, opfdStack, argsStack, opfdBases *Stack) formulaArg {
 	if !isFunctionStopToken(token) {
 		return newEmptyFormulaArg()
 	}
-	prepareEvalInfixExp(opfStack, opftStack, opfdStack, argsStack)
+	prepareEvalInfixExp(opfStack, opftStack, opfdStack, argsStack, opfdBases)
 	// call formula function to evaluate
 	arg := callFuncByName(&formulaFuncs{f: f, sheet: sheet, cell: cell, ctx: ctx},
 		formulaFnNameReplacer.Replace(opfStack.Peek().(efp.Token).TValue),
@@ -1229,6 +1234,7 @@ func (f *File) evalInfixExpFunc(ctx *calcContext, sheet, cell string, token, nex
 	argsStack.Pop()
 	opftStack.Pop() // remove current function separator
 	opfStack.Pop()
+	opfdBases.Pop()
 	if opfStack.Len() > 0 { // still in function stack
 		if nextToken.TType == efp.TokenTypeOperatorInfix || opftStack.Len() > 1 {
 			// mathematics calculate in formula function
@@ -1248,7 +1254,7 @@ func (f *File) evalInfixExpFunc(ctx *calcContext, sheet, cell string, token, nex
 
 // prepareEvalInfixExp check the token and stack state for formula function
 // evaluate.
-func prepareEvalInfixExp(opfStack, opftStack, opfdStack, argsStack *Stack) {
+func prepareEvalInfixExp(opfStack, opftStack, opfdStack, argsStack, opfdBases *Stack) {
 	// current token is function stop
 	for opftStack.Peek().(efp.Token) != opfStack.Peek().(efp.Token) {
 		// calculate trigger
@@ -1260,29 +1266,7 @@ func prepareEvalInfixExp(opfStack, opftStack, opfdStack, argsStack *Stack) {
 		}
 		opftStack.Pop()
 	}
-	argument := true
-	if opftStack.Len() > 2 && opfdStack.Len() == 1 {
-		topOpt := opftStack.Pop()
-		// Look past any subexpression start, function start, and prefix operator tokens
-		var savedTokens []efp.Token
-		for opftStack.Len() > 0 {
-			token := opftStack.Peek().(efp.Token)
-			if !isBeginParenthesesToken(token) && !isFunctionStartToken(token) && token.TType != efp.TokenTypeOperatorPrefix {
-				break
-			}
-			savedTokens = append(savedTokens, opftStack.Pop().(efp.Token))
-		}
-		if opftStack.Len() > 0 && opftStack.Peek().(efp.Token).TType == efp.TokenTypeOperatorInfix {
-			argument = false
-		}
-		// Restore saved tokens
-		for i := len(savedTokens) - 1; i >= 0; i-- {
-			opftStack.Push(savedTokens[i])
-		}
-		opftStack.Push(topOpt)
-	}
-	// push opfd to args
-	if argument && opfdStack.Len() > 0 {
+	if opfdStack.Len() > opfdBases.Peek().(int) {
 		argsStack.Peek().(*list.List).PushBack(opfdStack.Pop().(formulaArg))
 	}
 }
@@ -13007,6 +12991,9 @@ func (fn *formulaFuncs) EDATE(argsList *list.List) formulaArg {
 		return newErrorFormulaArg(formulaErrorVALUE, "EDATE requires 2 arguments")
 	}
 	date := argsList.Front().Value.(formulaArg)
+	if date.Type == ArgEmpty {
+		return newErrorFormulaArg(formulaErrorVALUE, "EDATE requires a start date")
+	}
 	num := date.ToNumber()
 	var dateTime time.Time
 	if num.Type != ArgNumber {
