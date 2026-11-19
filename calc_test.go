@@ -5425,6 +5425,42 @@ func TestCalcMAXMIN(t *testing.T) {
 	}
 }
 
+func TestCalcFunctionInsideParenthesesInsideFunction(t *testing.T) {
+	cellData := [][]interface{}{{100}, {2}, {nil}}
+	f := prepareCalcData(cellData)
+	formulaList := map[string]string{
+		"ROUND(2*(N(A2)+1),0)":                   "6",
+		"ROUND(2*(1+N(A2)),0)":                   "6",
+		"ROUND(2*(N(A2)),0)":                     "4",
+		"ROUND(2*(ABS(A2)+1),0)":                 "6",
+		"ROUND(N(A1)*(N(A2)+N(A2)),0)":           "400",
+		"ROUND(N(A1)*(N(A2)+N(A3)),0)":           "200",
+		"ROUND(N(A1)*(N(A3)),0)":                 "0",
+		"ROUND(A1-(N(A2)/A2+N(A3)),0)":           "99",
+		"ROUND(2*(MAX(A1,A2)+1),0)":              "202",
+		"ABS(2*(N(A2)+1))":                       "6",
+		"SUM(2*(N(A2)+1),1)":                     "7",
+		"SUM(1,2*(ABS(-3)+1),4)":                 "13",
+		"IF(A1<=0,0,ROUND(A2/A1*12,1))":          "0.2",
+		"IF(A1<=0,0,ROUND(2*(N(A2)+N(A3)),0))":   "4",
+		"ROUND(N(A1)*(N(A2)+N(A3)),0)+(N(A2)*2)": "204",
+	}
+	for formula, expected := range formulaList {
+		assert.NoError(t, f.SetCellFormula("Sheet1", "B1", formula))
+		result, err := f.CalcCellValue("Sheet1", "B1")
+		assert.NoError(t, err, formula)
+		assert.Equal(t, expected, result, formula)
+	}
+}
+
+func TestCalcEDATEWithEmptyStartDate(t *testing.T) {
+	f := NewFile()
+	assert.NoError(t, f.SetCellFormula("Sheet1", "B1", "EDATE(A1,12)"))
+	result, err := f.CalcCellValue("Sheet1", "B1")
+	assert.EqualError(t, err, "EDATE requires a start date")
+	assert.Equal(t, formulaErrorVALUE, result)
+}
+
 func TestCalcAVERAGEIF(t *testing.T) {
 	f := prepareCalcData([][]interface{}{
 		{"Monday", 500},
